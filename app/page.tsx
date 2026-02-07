@@ -61,7 +61,7 @@ export default function Dashboard() {
       const { data: todaySalesData } = await supabase
         .from('sales')
         .select('net_amount')
-        .eq('sale_date', today)
+        .eq('sale_date', today) as { data: { net_amount: number }[] | null }
 
       const todaySalesTotal = todaySalesData?.reduce(
         (sum, sale) => sum + (sale.net_amount || 0),
