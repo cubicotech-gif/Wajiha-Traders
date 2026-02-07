@@ -30,8 +30,8 @@ export default function NewVendorPage() {
     try {
       const { error } = await supabase.from('vendors').insert({
         name: formData.name,
-        phone: formData.phone || null,
-        address: formData.address || null,
+        phone: formData.phone || undefined,
+        address: formData.address || undefined,
         default_discount_percent: parseFloat(formData.default_discount_percent),
         outstanding_balance: 0,
       })

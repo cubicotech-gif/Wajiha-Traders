@@ -122,7 +122,7 @@ export default function NewSalePage() {
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert({
-          customer_id: formData.customer_id || null,
+          customer_id: formData.customer_id || undefined,
           sale_date: formData.sale_date,
           bill_number,
           payment_type: formData.payment_type,
@@ -133,7 +133,7 @@ export default function NewSalePage() {
           paid_amount: totals.paid_amount,
           remaining_balance: totals.remaining_balance,
           status: totals.remaining_balance === 0 ? 'paid' : 'pending',
-          notes: formData.notes || null,
+          notes: formData.notes || undefined,
         })
         .select()
         .single()

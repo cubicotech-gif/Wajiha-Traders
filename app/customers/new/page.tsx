@@ -31,9 +31,9 @@ export default function NewCustomerPage() {
     try {
       const { error } = await supabase.from('customers').insert({
         name: formData.name,
-        shop_name: formData.shop_name || null,
-        phone: formData.phone || null,
-        address: formData.address || null,
+        shop_name: formData.shop_name || undefined,
+        phone: formData.phone || undefined,
+        address: formData.address || undefined,
         credit_limit: parseFloat(formData.credit_limit),
         outstanding_balance: 0,
       })

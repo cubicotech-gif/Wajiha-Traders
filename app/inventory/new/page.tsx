@@ -51,9 +51,9 @@ export default function NewProductPage() {
     try {
       const { error } = await supabase.from('products').insert({
         name: formData.name,
-        company_id: formData.company_id || null,
+        company_id: formData.company_id || undefined,
         unit_type: formData.unit_type,
-        unit_value: formData.unit_value ? parseFloat(formData.unit_value) : null,
+        unit_value: formData.unit_value ? parseFloat(formData.unit_value) : undefined,
         retail_price: parseFloat(formData.retail_price),
         current_stock: parseFloat(formData.current_stock),
         min_stock_level: parseFloat(formData.min_stock_level),

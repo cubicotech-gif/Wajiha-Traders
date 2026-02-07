@@ -138,7 +138,7 @@ export default function NewPurchasePage() {
           net_amount: totals.net_amount,
           paid_amount: totals.paid_amount,
           remaining_balance: totals.remaining_balance,
-          notes: formData.notes || null,
+          notes: formData.notes || undefined,
         })
         .select()
         .single()
