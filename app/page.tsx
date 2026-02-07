@@ -77,7 +77,7 @@ export default function Dashboard() {
       // Get total receivables
       const { data: receivablesData } = await supabase
         .from('customers')
-        .select('outstanding_balance')
+        .select('outstanding_balance') as { data: { outstanding_balance: number }[] | null }
 
       const totalReceivables = receivablesData?.reduce(
         (sum, customer) => sum + (customer.outstanding_balance || 0),
@@ -87,7 +87,7 @@ export default function Dashboard() {
       // Get total payables
       const { data: payablesData } = await supabase
         .from('vendors')
-        .select('outstanding_balance')
+        .select('outstanding_balance') as { data: { outstanding_balance: number }[] | null }
 
       const totalPayables = payablesData?.reduce(
         (sum, vendor) => sum + (vendor.outstanding_balance || 0),
