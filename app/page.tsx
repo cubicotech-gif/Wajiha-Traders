@@ -1,232 +1,76 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { formatCurrency, isLowStock } from '@/lib/utils'
 import Link from 'next/link'
-import {
-  Package,
-  ShoppingCart,
-  Users,
-  TrendingUp,
-  AlertTriangle,
-  FileText,
-} from 'lucide-react'
-
-type RecentSale = {
-  id: string
-  bill_number: string | null
-  sale_date: string
-  net_amount: number
-  status: string
-  customers: { name: string; shop_name: string | null } | null
-}
+import { useStored, formatPKR, today } from '@/lib/storage'
+import type { Product, Customer, Sale } from '@/lib/types'
+import { Package, Users, FileText, AlertTriangle } from 'lucide-react'
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    lowStockProducts: 0,
-    totalCustomers: 0,
-    totalVendors: 0,
-    todaySales: 0,
-    totalReceivables: 0,
-    totalPayables: 0,
-  })
-  const [loading, setLoading] = useState(true)
-  const [recentSales, setRecentSales] = useState<RecentSale[]>([])
+  const [products] = useStored<Product[]>('products', [])
+  const [customers] = useStored<Customer[]>('customers', [])
+  const [sales] = useStored<Sale[]>('sales', [])
 
-  useEffect(() => {
-    loadDashboardData()
-  }, [])
+  const lowStock = products.filter((p) => p.stock <= 10).length
+  const todayStr = today()
+  const todaySales = sales
+    .filter((s) => s.date === todayStr)
+    .reduce((sum, s) => sum + s.total, 0)
+  const pending = sales
+    .filter((s) => s.status === 'pending')
+    .reduce((sum, s) => sum + (s.total - s.paid), 0)
 
-  const loadDashboardData = async () => {
-    try {
-      const { count: productsCount } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
+  const stats = [
+    { label: 'Products', value: products.length, icon: Package, color: 'bg-blue-100 text-blue-600', href: '/products' },
+    { label: 'Low Stock', value: lowStock, icon: AlertTriangle, color: 'bg-amber-100 text-amber-600', href: '/products' },
+    { label: 'Customers', value: customers.length, icon: Users, color: 'bg-green-100 text-green-600', href: '/customers' },
+    { label: 'Sales', value: sales.length, icon: FileText, color: 'bg-purple-100 text-purple-600', href: '/sales' },
+  ]
 
-      // Fetch stock levels and compare client-side (PostgREST can't compare two columns directly)
-      const { data: products } = await supabase
-        .from('products')
-        .select('current_stock, min_stock_level')
-
-      const lowStock =
-        products?.filter((p) =>
-          isLowStock(p.current_stock || 0, p.min_stock_level || 0)
-        ).length || 0
-
-      const { count: customersCount } = await supabase
-        .from('customers')
-        .select('*', { count: 'exact', head: true })
-
-      const { count: vendorsCount } = await supabase
-        .from('vendors')
-        .select('*', { count: 'exact', head: true })
-
-      const today = new Date().toISOString().split('T')[0]
-      const { data: todaySalesData } = await supabase
-        .from('sales')
-        .select('net_amount')
-        .eq('sale_date', today)
-
-      const todaySalesTotal =
-        todaySalesData?.reduce(
-          (sum, sale) => sum + (sale.net_amount || 0),
-          0
-        ) || 0
-
-      const { data: receivablesData } = await supabase
-        .from('customers')
-        .select('outstanding_balance')
-
-      const totalReceivables =
-        receivablesData?.reduce(
-          (sum, c) => sum + (c.outstanding_balance || 0),
-          0
-        ) || 0
-
-      const { data: payablesData } = await supabase
-        .from('vendors')
-        .select('outstanding_balance')
-
-      const totalPayables =
-        payablesData?.reduce(
-          (sum, v) => sum + (v.outstanding_balance || 0),
-          0
-        ) || 0
-
-      const { data: recentSalesData } = await supabase
-        .from('sales')
-        .select('id, bill_number, sale_date, net_amount, status, customers(name, shop_name)')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      setStats({
-        totalProducts: productsCount || 0,
-        lowStockProducts: lowStock,
-        totalCustomers: customersCount || 0,
-        totalVendors: vendorsCount || 0,
-        todaySales: todaySalesTotal,
-        totalReceivables,
-        totalPayables,
-      })
-
-      setRecentSales((recentSalesData as any) || [])
-    } catch (error) {
-      console.error('Error loading dashboard:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="page-container">
-        <div className="flex items-center justify-center h-96">
-          <div className="spinner w-12 h-12"></div>
-        </div>
-      </div>
-    )
-  }
+  const recent = [...sales].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5)
 
   return (
-    <div className="page-container">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 text-sm">Welcome to Wajeeha Traders</p>
-      </div>
+    <div className="page">
+      <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
+      <p className="text-gray-600 text-sm mb-6">Welcome to Wajeeha Traders</p>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Link href="/inventory" className="stat-card">
-          <div className="stat-icon bg-primary-100 text-primary-600 mb-2">
-            <Package size={20} />
-          </div>
-          <div className="text-xl font-bold">{stats.totalProducts}</div>
-          <div className="text-xs text-gray-600">Products</div>
-        </Link>
-
-        <Link href="/inventory" className="stat-card">
-          <div className="stat-icon bg-warning-100 text-warning-600 mb-2">
-            <AlertTriangle size={20} />
-          </div>
-          <div className="text-xl font-bold">{stats.lowStockProducts}</div>
-          <div className="text-xs text-gray-600">Low Stock</div>
-        </Link>
-
-        <Link href="/customers" className="stat-card">
-          <div className="stat-icon bg-success-100 text-success-600 mb-2">
-            <Users size={20} />
-          </div>
-          <div className="text-xl font-bold">{stats.totalCustomers}</div>
-          <div className="text-xs text-gray-600">Customers</div>
-        </Link>
-
-        <Link href="/vendors" className="stat-card">
-          <div className="stat-icon bg-primary-100 text-primary-600 mb-2">
-            <ShoppingCart size={20} />
-          </div>
-          <div className="text-xl font-bold">{stats.totalVendors}</div>
-          <div className="text-xs text-gray-600">Vendors</div>
-        </Link>
-      </div>
-
-      {/* Money row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <div className="card">
-          <div className="flex items-center gap-2 mb-1 text-gray-600 text-sm">
-            <TrendingUp size={16} /> Today&apos;s Sales
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            {formatCurrency(stats.todaySales)}
-          </div>
-        </div>
-        <Link href="/accounts/receivables" className="card hover:border-primary-300">
-          <div className="text-gray-600 text-sm mb-1">Receivables</div>
-          <div className="text-2xl font-bold text-success-600">
-            {formatCurrency(stats.totalReceivables)}
-          </div>
-        </Link>
-        <Link href="/accounts/payables" className="card hover:border-primary-300">
-          <div className="text-gray-600 text-sm mb-1">Payables</div>
-          <div className="text-2xl font-bold text-danger-600">
-            {formatCurrency(stats.totalPayables)}
-          </div>
-        </Link>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Link href="/sales/new" className="btn-primary text-center">
-          New Sale
-        </Link>
-        <Link href="/purchases/new" className="btn-secondary text-center">
-          New Purchase
-        </Link>
-        <Link href="/inventory/new" className="btn-secondary text-center">
-          Add Product
-        </Link>
-        <Link href="/accounts/dsr" className="btn-outline text-center">
-          View DSR
-        </Link>
-      </div>
-
-      {/* Recent Sales */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Sales</h2>
-          <Link href="/sales" className="text-sm text-primary-600 hover:underline">
-            View All
+        {stats.map((s) => (
+          <Link href={s.href} key={s.label} className="card hover:border-blue-300">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-2 ${s.color}`}>
+              <s.icon size={18} />
+            </div>
+            <div className="text-xl font-bold">{s.value}</div>
+            <div className="text-xs text-gray-600">{s.label}</div>
           </Link>
-        </div>
+        ))}
+      </div>
 
-        {recentSales.length === 0 ? (
-          <div className="empty-state">
-            <FileText size={40} className="text-gray-300 mb-2" />
-            <p className="text-gray-500 text-sm">No sales yet</p>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+        <div className="card">
+          <div className="text-xs text-gray-600 mb-1">Today&apos;s Sales</div>
+          <div className="text-2xl font-bold">{formatPKR(todaySales)}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-600 mb-1">Outstanding</div>
+          <div className="text-2xl font-bold text-red-600">{formatPKR(pending)}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <Link href="/sales" className="btn-primary text-center">New Sale</Link>
+        <Link href="/products" className="btn-secondary text-center">Add Product</Link>
+        <Link href="/customers" className="btn-secondary text-center">Add Customer</Link>
+      </div>
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">Recent Sales</h2>
+          <Link href="/sales" className="text-sm text-blue-600 hover:underline">View All</Link>
+        </div>
+        {recent.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">No sales yet</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
@@ -238,29 +82,21 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentSales.map((sale) => (
-                  <tr key={sale.id}>
-                    <td className="font-medium">{sale.bill_number || '-'}</td>
-                    <td>
-                      {sale.customers?.shop_name ||
-                        sale.customers?.name ||
-                        'Walk-in'}
-                    </td>
-                    <td>{new Date(sale.sale_date).toLocaleDateString()}</td>
-                    <td className="font-semibold">
-                      {formatCurrency(sale.net_amount)}
-                    </td>
+                {recent.map((s) => (
+                  <tr key={s.id}>
+                    <td className="font-medium">{s.billNumber}</td>
+                    <td>{s.customerName}</td>
+                    <td>{s.date}</td>
+                    <td className="font-semibold">{formatPKR(s.total)}</td>
                     <td>
                       <span
-                        className={`badge ${
-                          sale.status === 'paid'
-                            ? 'bg-success-100 text-success-700'
-                            : sale.status === 'pending'
-                            ? 'bg-warning-100 text-warning-700'
-                            : 'bg-primary-100 text-primary-700'
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                          s.status === 'paid'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-amber-100 text-amber-700'
                         }`}
                       >
-                        {sale.status}
+                        {s.status}
                       </span>
                     </td>
                   </tr>

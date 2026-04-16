@@ -1,47 +1,54 @@
 'use client'
 
 import { useState } from 'react'
-import { useStored, uid } from '@/lib/storage'
-import type { Customer } from '@/lib/types'
+import { useStored, uid, formatPKR } from '@/lib/storage'
+import type { Product } from '@/lib/types'
 import { Plus, Trash2, Pencil, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-export default function CustomersPage() {
-  const [customers, setCustomers] = useStored<Customer[]>('customers', [])
+export default function ProductsPage() {
+  const [products, setProducts] = useStored<Product[]>('products', [])
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<Customer | null>(null)
+  const [editing, setEditing] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState({ name: '', shop: '', phone: '' })
+  const [form, setForm] = useState({ name: '', company: '', price: '', stock: '' })
 
   const openAdd = () => {
     setEditing(null)
-    setForm({ name: '', shop: '', phone: '' })
+    setForm({ name: '', company: '', price: '', stock: '' })
     setOpen(true)
   }
 
-  const openEdit = (c: Customer) => {
-    setEditing(c)
-    setForm({ name: c.name, shop: c.shop, phone: c.phone })
+  const openEdit = (p: Product) => {
+    setEditing(p)
+    setForm({
+      name: p.name,
+      company: p.company,
+      price: p.price.toString(),
+      stock: p.stock.toString(),
+    })
     setOpen(true)
   }
 
   const save = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return toast.error('Name required')
+    const price = Number(form.price) || 0
+    const stock = Number(form.stock) || 0
 
     if (editing) {
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === editing.id
-            ? { ...c, name: form.name.trim(), shop: form.shop.trim(), phone: form.phone.trim() }
-            : c
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === editing.id
+            ? { ...p, name: form.name.trim(), company: form.company.trim(), price, stock }
+            : p
         )
       )
       toast.success('Updated')
     } else {
-      setCustomers((prev) => [
+      setProducts((prev) => [
         ...prev,
-        { id: uid(), name: form.name.trim(), shop: form.shop.trim(), phone: form.phone.trim() },
+        { id: uid(), name: form.name.trim(), company: form.company.trim(), price, stock },
       ])
       toast.success('Added')
     }
@@ -49,23 +56,23 @@ export default function CustomersPage() {
   }
 
   const remove = (id: string) => {
-    if (!confirm('Delete this customer?')) return
-    setCustomers((prev) => prev.filter((c) => c.id !== id))
+    if (!confirm('Delete this product?')) return
+    setProducts((prev) => prev.filter((p) => p.id !== id))
     toast.success('Deleted')
   }
 
-  const filtered = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.shop.toLowerCase().includes(search.toLowerCase())
+  const filtered = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.company.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
     <div className="page">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Customers</h1>
+        <h1 className="text-2xl font-bold">Products</h1>
         <button onClick={openAdd} className="btn-primary flex items-center gap-1.5">
-          <Plus size={16} /> Add Customer
+          <Plus size={16} /> Add Product
         </button>
       </div>
 
@@ -83,30 +90,34 @@ export default function CustomersPage() {
 
       <div className="card">
         {filtered.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-8">No customers yet</p>
+          <p className="text-sm text-gray-500 text-center py-8">No products yet</p>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Shop</th>
-                  <th>Phone</th>
+                  <th>Company</th>
+                  <th>Price</th>
+                  <th>Stock</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => (
-                  <tr key={c.id}>
-                    <td className="font-medium">{c.name}</td>
-                    <td>{c.shop || '-'}</td>
-                    <td>{c.phone || '-'}</td>
+                {filtered.map((p) => (
+                  <tr key={p.id}>
+                    <td className="font-medium">{p.name}</td>
+                    <td>{p.company || '-'}</td>
+                    <td>{formatPKR(p.price)}</td>
+                    <td className={p.stock <= 10 ? 'text-red-600 font-medium' : ''}>
+                      {p.stock}
+                    </td>
                     <td>
                       <div className="flex gap-2 justify-end">
-                        <button onClick={() => openEdit(c)} className="text-gray-500 hover:text-blue-600">
+                        <button onClick={() => openEdit(p)} className="text-gray-500 hover:text-blue-600">
                           <Pencil size={15} />
                         </button>
-                        <button onClick={() => remove(c.id)} className="text-gray-500 hover:text-red-600">
+                        <button onClick={() => remove(p.id)} className="text-gray-500 hover:text-red-600">
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -120,7 +131,7 @@ export default function CustomersPage() {
       </div>
 
       {open && (
-        <Modal title={editing ? 'Edit Customer' : 'Add Customer'} onClose={() => setOpen(false)}>
+        <Modal title={editing ? 'Edit Product' : 'Add Product'} onClose={() => setOpen(false)}>
           <form onSubmit={save} className="space-y-3">
             <div>
               <label className="label">Name *</label>
@@ -132,21 +143,32 @@ export default function CustomersPage() {
               />
             </div>
             <div>
-              <label className="label">Shop / Mart</label>
+              <label className="label">Company</label>
               <input
                 className="input"
-                value={form.shop}
-                onChange={(e) => setForm({ ...form, shop: e.target.value })}
+                value={form.company}
+                onChange={(e) => setForm({ ...form, company: e.target.value })}
               />
             </div>
-            <div>
-              <label className="label">Phone</label>
-              <input
-                className="input"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="0300-1234567"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Price (Rs.)</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Stock</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.stock}
+                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                />
+              </div>
             </div>
             <div className="flex gap-2 pt-2">
               <button type="submit" className="btn-primary flex-1">
